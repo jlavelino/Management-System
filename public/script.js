@@ -1,0 +1,255 @@
+document.addEventListener("DOMContentLoaded", () => {
+  const form = document.getElementById("studentForm");
+  const fields = {
+    studentId: document.getElementById("studentId"),
+    fullName: document.getElementById("fullName"),
+    gmail: document.getElementById("gmail"),
+    gender: document.getElementById("gender"),
+    program: document.getElementById("program"),
+    yearLevel: document.getElementById("yearLevel"),
+    university: document.getElementById("university"),
+  };
+  const errors = Array.from(form.querySelectorAll(".form-error"));
+  const tableBody = document.querySelector("#studentTable tbody");
+  const filters = document.querySelectorAll('input[name="filter"]');
+  const searchBox = document.getElementById("searchBox");
+  let students = [];
+
+  const courseFilter = document.getElementById("courseFilter");
+
+  function populateCourses(students) {
+    const programs = Array.from(
+      new Set(students.map((s) => s.program).filter(Boolean))
+    ).sort();
+    courseFilter.innerHTML = '<option value="">All Courses</option>';
+    programs.forEach((prog) => {
+      courseFilter.innerHTML += `<option value="${prog}">${prog}</option>`;
+    });
+  }
+
+  courseFilter.addEventListener("change", renderStudents);
+
+  // Show Toast Modal
+  function showToast(msg, success = true) {
+    const modal = document.getElementById("toastModal");
+    const message = document.getElementById("toastMessage");
+    const icon = document.querySelector(".toast-icon");
+    if (!modal || !message || !icon) return;
+
+    message.textContent = msg;
+
+    if (success) {
+      icon.textContent = "✓";
+      icon.style.background =
+        "linear-gradient(135deg, #2d7a2d 0%, #1a5c1a 100%)";
+      message.style.color = "#1a5c1a";
+    } else {
+      icon.textContent = "✗";
+      icon.style.background =
+        "linear-gradient(135deg, #c94e3a 0%, #a83d2c 100%)";
+      message.style.color = "#c94e3a";
+    }
+    modal.classList.add("show");
+    setTimeout(() => {
+      modal.classList.remove("show");
+    }, 2000);
+  }
+
+  // Show Confirmation Modal
+  function showConfirmation(title, text) {
+    return new Promise((resolve) => {
+      const modal = document.getElementById("confirmModal");
+      const titleEl = document.getElementById("confirmTitle");
+      const textEl = document.getElementById("confirmText");
+      const btnConfirm = document.getElementById("btnConfirm");
+      const btnCancel = document.getElementById("btnCancel");
+
+      titleEl.textContent = title;
+      textEl.textContent = text;
+      modal.classList.add("show");
+
+      const handleConfirm = () => {
+        modal.classList.remove("show");
+        cleanup();
+        resolve(true);
+      };
+
+      const handleCancel = () => {
+        modal.classList.remove("show");
+        cleanup();
+        resolve(false);
+      };
+
+      const cleanup = () => {
+        btnConfirm.removeEventListener("click", handleConfirm);
+        btnCancel.removeEventListener("click", handleCancel);
+      };
+
+      btnConfirm.addEventListener("click", handleConfirm);
+      btnCancel.addEventListener("click", handleCancel);
+    });
+  }
+
+  // Validate Field
+  function validateField(input, idx) {
+    const value = input.value.trim();
+    let message = "";
+    if (!value) {
+      message = "This field is required.";
+    } else if (input.id === "studentId" && !/^[A-Za-z0-9-]+$/.test(value)) {
+      message = "Student ID must contain only letters, numbers, and hyphens.";
+    } else if (input.id === "gmail" && !/^[^@]+@[^@]+\.[^@]+$/.test(value)) {
+      message = "Invalid email format.";
+    } else if (input.id === "yearLevel" && !value) {
+      message = "Please select a Year Level.";
+    }
+
+    errors[idx].textContent = message;
+    input.classList.toggle("form-invalid", !!message);
+    return !message;
+  }
+
+  Object.values(fields).forEach((f, idx) =>
+    f.addEventListener("input", () => validateField(f, idx))
+  );
+
+  // Form Submit with Confirmation
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    let isValid = true;
+    Object.values(fields).forEach((f, idx) => {
+      if (!validateField(f, idx)) isValid = false;
+    });
+    if (!isValid) {
+      showToast("Please correct errors above.", false);
+      return;
+    }
+
+    // Show confirmation dialog
+    const confirmed = await showConfirmation(
+      "Add Student",
+      "Are you sure you want to add this student?"
+    );
+
+    if (!confirmed) return;
+
+    const newStudent = {
+      studentId: fields.studentId.value.trim(),
+      name: fields.fullName.value.trim(),
+      gmail: fields.gmail.value.trim(),
+      gender: fields.gender.value.trim(),
+      program: fields.program.value.trim(),
+      yearLevel: fields.yearLevel.value.trim(),
+      university: fields.university.value.trim(),
+    };
+
+    try {
+      const res = await fetch("/students", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newStudent),
+      });
+      if (!res.ok) {
+        showToast("❌ Error adding student", false);
+        return;
+      }
+      form.reset();
+      errors.forEach((e) => (e.textContent = ""));
+      showToast("Student added!");
+      fetchStudents();
+    } catch (error) {
+      showToast("❌ Network error", false);
+    }
+  });
+
+  async function fetchStudents() {
+    try {
+      const res = await fetch("/students");
+      students = await res.json();
+      populateCourses(students);
+      renderStudents();
+    } catch (error) {
+      console.error("Error fetching students:", error);
+    }
+  }
+
+  function renderStudents() {
+    tableBody.innerHTML = "";
+    let filtered = [...students];
+    const selected = document.querySelector(
+      'input[name="filter"]:checked'
+    ).value;
+    const query = searchBox.value.toLowerCase();
+
+    if (selected === "name")
+      filtered.sort((a, b) => a.name.localeCompare(b.name));
+    const selectedProgram = courseFilter.value;
+    if (selectedProgram) {
+      filtered = filtered.filter((s) => s.program === selectedProgram);
+    }
+
+    if (selected === "male")
+      filtered = filtered.filter((s) => s.gender === "Male");
+    if (selected === "female")
+      filtered = filtered.filter((s) => s.gender === "Female");
+    if (query)
+      filtered = filtered.filter((s) => s.name.toLowerCase().includes(query));
+
+    filtered.forEach((s) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+  <td>${s.studentId}</td>
+  <td>${s.name}</td>
+  <td>${s.gender}</td>
+  <td>${s.gmail}</td>
+  <td>${s.program}</td>
+  <td>${s.yearLevel}</td>
+  <td>${s.university}</td>
+  <td style="text-align: right;">
+    <button class="delete-btn" data-id="${s.id}" title="Delete">
+      <i class="bi bi-trash3"></i>
+    </button>
+  </td>
+`;
+
+      tableBody.appendChild(tr);
+    });
+
+    // Delete with Confirmation
+    document.querySelectorAll(".delete-btn").forEach((btn) => {
+      btn.addEventListener("click", async (e) => {
+        const id = btn.dataset.id;
+
+        // Show confirmation dialog
+        const confirmed = await showConfirmation(
+          "Delete Student",
+          "Are you sure you want to delete this student? This action cannot be undone."
+        );
+
+        if (!confirmed) return;
+
+        try {
+          await fetch(`/students/${id}`, { method: "DELETE" });
+          showToast("Student deleted.");
+          fetchStudents();
+        } catch (error) {
+          showToast("❌ Error deleting student", false);
+        }
+      });
+    });
+  }
+
+  fetchStudents();
+  filters.forEach((f) => f.addEventListener("change", renderStudents));
+  searchBox.addEventListener("input", renderStudents);
+});
+
+window.addEventListener("load", () => {
+  const preloader = document.getElementById("preloader");
+  setTimeout(() => {
+    if (preloader) preloader.classList.add("hide");
+    setTimeout(() => {
+      if (preloader) preloader.remove();
+    }, 1200);
+  }, 3000);
+});
