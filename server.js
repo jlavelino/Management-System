@@ -8,6 +8,7 @@ app.use(express.static("public"));
 
 const DATA_FILE = path.join(__dirname, "students.json");
 
+// Function to read student data
 function readStudents() {
   if (!fs.existsSync(DATA_FILE)) {
     fs.writeFileSync(DATA_FILE, "[]", "utf-8");
@@ -16,10 +17,12 @@ function readStudents() {
   return JSON.parse(data);
 }
 
+// Function to write student data
 function writeStudents(data) {
   fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2), "utf-8");
 }
 
+// Ensure all students have unique IDs
 function ensureStudentIds() {
   let students = readStudents();
   let changed = false;
@@ -33,6 +36,7 @@ function ensureStudentIds() {
 }
 ensureStudentIds();
 
+// Get all students
 app.get("/students", (req, res) => {
   try {
     const students = readStudents();
@@ -43,6 +47,7 @@ app.get("/students", (req, res) => {
   }
 });
 
+// Add a new student
 app.post("/students", (req, res) => {
   try {
     let newStudent = req.body;
@@ -63,6 +68,7 @@ app.post("/students", (req, res) => {
   }
 });
 
+// Delete a student by ID
 app.delete("/students/:id", (req, res) => {
   try {
     const studentId = req.params.id;
@@ -79,7 +85,8 @@ app.delete("/students/:id", (req, res) => {
   }
 });
 
-const PORT = 3000;
-app.listen(PORT, () =>
-  console.log(`Server running at http://localhost:${PORT}`)
-);
+// ✅ Use dynamic port for Render
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`✅ Server running at http://localhost:${PORT}`);
+});
