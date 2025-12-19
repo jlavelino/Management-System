@@ -48,7 +48,6 @@
                 <option value="Internship">Internship</option>
                 <option value="Graduating">Graduating</option>
               </select>
-
               <div class="form-error"></div>
               <input type="text" id="university" placeholder="University" />
               <div class="form-error"></div>
@@ -56,7 +55,6 @@
                 <i class="bi bi-person-fill-add"></i>
                 Add Student
               </button>
-
               <div id="toast"></div>
             </form>
           </div>
@@ -68,7 +66,6 @@
                   ><input type="radio" name="filter" value="all" checked />
                   All</label
                 >
-
                 <label
                   ><input type="radio" name="filter" value="male" /> Male</label
                 >
@@ -76,10 +73,7 @@
                   ><input type="radio" name="filter" value="female" />
                   Female</label
                 >
-                <label>
-                  <select id="courseFilter"></select>
-                </label>
-
+                <label><select id="courseFilter"></select></label>
                 <input
                   type="text"
                   id="searchBox"
@@ -99,20 +93,55 @@
                     <th>Program</th>
                     <th>Year Level</th>
                     <th>University</th>
+                    <th>Action</th>
                   </tr>
                 </thead>
-
-                <tbody>
-                  <!-- rows added by JS -->
-                </tbody>
+                <tbody></tbody>
               </table>
             </div>
           </div>
         </div>
       </div>
     </div>
-    <script src="script.js"></script>
-    <!-- Toast Modal -->
+
+    <button id="chatToggleBtn" class="chat-toggle-btn" title="Ask AI">
+      <i class="bi bi-chat-dots-fill"></i>
+    </button>
+
+    <div id="chatContainer" class="chat-container hidden">
+      <div class="chat-header">
+        <span><i class="bi bi-robot"></i> Student AI</span>
+        <button id="closeChatBtn"><i class="bi bi-x-lg"></i></button>
+      </div>
+      <div id="chatHistory" class="chat-history">
+        <div class="message bot-message">
+          Hello! Ask me anything about the student data.
+        </div>
+      </div>
+      <div class="chat-input-area">
+        <div id="chatSuggestions" class="suggestions-row">
+          <button class="chip" onclick="fillChat('How many BSIT students?')">
+            Count BSIT
+          </button>
+          <button class="chip" onclick="fillChat('List all 4th year students')">
+            List 4th Year
+          </button>
+          <button class="chip" onclick="fillChat('Who is the oldest student?')">
+            Oldest Student
+          </button>
+        </div>
+
+        <div class="input-wrapper">
+          <input
+            type="text"
+            id="chatInput"
+            placeholder="Ex: How many BSIT students?"
+          />
+          <button id="sendMessageBtn"><i class="bi bi-send-fill"></i></button>
+        </div>
+      </div>
+    </div>
+
     <div id="toastModal" class="toast-modal">
       <div class="toast-content">
         <div class="toast-icon">✓</div>
@@ -120,7 +149,6 @@
       </div>
     </div>
 
-    <!-- Confirmation Modal -->
     <div id="confirmModal" class="confirm-modal">
       <div class="confirm-content">
         <div class="confirm-icon">⚠</div>
@@ -142,5 +170,7 @@
       </div>
       <span class="preloader-text">Loading...</span>
     </div>
+
+    <script src="script.js"></script>
   </body>
 </html>

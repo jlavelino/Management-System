@@ -1,7 +1,11 @@
+require("dotenv").config();
 const express = require("express");
 const fs = require("fs");
 const path = require("path");
+const Groq = require("groq-sdk");
+
 const app = express();
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 app.use(express.json());
 app.use(express.static("public"));
@@ -36,6 +40,47 @@ function ensureStudentIds() {
 }
 ensureStudentIds();
 
+// chat route
+app.post("/chat", async (req, res) => {
+  try {
+    const { message } = req.body;
+
+    // get Real Data
+    const students = readStudents();
+    const studentDataString = JSON.stringify(students);
+
+    // system Prompt
+    const systemPrompt = `
+  You are a helpful data analyst for a Student Information System.
+  Here is the current database of students in JSON format:
+  ${studentDataString}
+  
+  Instructions:
+  1. Answer the user's question based ONLY on this data.
+  2. If the user asks "Who am I?" or "What is my name?", explain that you only have access to the student database and do not know the user's identity.
+  3. Format lists clearly with line breaks.
+`;
+
+    // 3. Call AI
+    const chatCompletion = await groq.chat.completions.create({
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: message },
+      ],
+      model: "llama-3.3-70b-versatile",
+      temperature: 0.5,
+    });
+
+    const botReply =
+      chatCompletion.choices[0]?.message?.content ||
+      "I couldn't generate a response.";
+    res.json({ reply: botReply });
+  } catch (error) {
+    console.error("AI Error:", error);
+    res.status(500).json({ error: "Failed to process chat request." });
+  }
+});
+
 // Get all students
 app.get("/students", (req, res) => {
   try {
@@ -51,9 +96,12 @@ app.get("/students", (req, res) => {
 app.post("/students", (req, res) => {
   try {
     let newStudent = req.body;
+    // Basic validation
     if (!newStudent.studentId || !newStudent.name) {
       return res.status(400).json({ error: "Missing student ID or name" });
     }
+
+    // Assign internal ID if missing
     newStudent.id =
       newStudent.id || Date.now() + Math.floor(Math.random() * 10000000);
 
@@ -85,7 +133,6 @@ app.delete("/students/:id", (req, res) => {
   }
 });
 
-// ✅ Use dynamic port for Render
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`✅ Server running at http://localhost:${PORT}`);

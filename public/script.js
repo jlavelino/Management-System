@@ -37,7 +37,6 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!modal || !message || !icon) return;
 
     message.textContent = msg;
-
     if (success) {
       icon.textContent = "✓";
       icon.style.background =
@@ -103,7 +102,6 @@ document.addEventListener("DOMContentLoaded", () => {
     } else if (input.id === "yearLevel" && !value) {
       message = "Please select a Year Level.";
     }
-
     errors[idx].textContent = message;
     input.classList.toggle("form-invalid", !!message);
     return !message;
@@ -113,7 +111,7 @@ document.addEventListener("DOMContentLoaded", () => {
     f.addEventListener("input", () => validateField(f, idx))
   );
 
-  // Form Submit with Confirmation
+  // Form Submit
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     let isValid = true;
@@ -125,12 +123,10 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    // Show confirmation dialog
     const confirmed = await showConfirmation(
       "Add Student",
       "Are you sure you want to add this student?"
     );
-
     if (!confirmed) return;
 
     const newStudent = {
@@ -183,6 +179,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (selected === "name")
       filtered.sort((a, b) => a.name.localeCompare(b.name));
+
     const selectedProgram = courseFilter.value;
     if (selectedProgram) {
       filtered = filtered.filter((s) => s.program === selectedProgram);
@@ -198,34 +195,30 @@ document.addEventListener("DOMContentLoaded", () => {
     filtered.forEach((s) => {
       const tr = document.createElement("tr");
       tr.innerHTML = `
-  <td>${s.studentId}</td>
-  <td>${s.name}</td>
-  <td>${s.gender}</td>
-  <td>${s.gmail}</td>
-  <td>${s.program}</td>
-  <td>${s.yearLevel}</td>
-  <td>${s.university}</td>
-  <td style="text-align: right;">
-    <button class="delete-btn" data-id="${s.id}" title="Delete">
-      <i class="bi bi-trash3"></i>
-    </button>
-  </td>
-`;
-
+        <td>${s.studentId}</td>
+        <td>${s.name}</td>
+        <td>${s.gender}</td>
+        <td>${s.gmail}</td>
+        <td>${s.program}</td>
+        <td>${s.yearLevel}</td>
+        <td>${s.university}</td>
+        <td style="text-align: right;">
+          <button class="delete-btn" data-id="${s.id}" title="Delete">
+            <i class="bi bi-trash3"></i>
+          </button>
+        </td>
+      `;
       tableBody.appendChild(tr);
     });
 
-    // Delete with Confirmation
+    // Delete Button Logic
     document.querySelectorAll(".delete-btn").forEach((btn) => {
       btn.addEventListener("click", async (e) => {
         const id = btn.dataset.id;
-
-        // Show confirmation dialog
         const confirmed = await showConfirmation(
           "Delete Student",
-          "Are you sure you want to delete this student? This action cannot be undone."
+          "Are you sure? This action cannot be undone."
         );
-
         if (!confirmed) return;
 
         try {
@@ -242,14 +235,141 @@ document.addEventListener("DOMContentLoaded", () => {
   fetchStudents();
   filters.forEach((f) => f.addEventListener("change", renderStudents));
   searchBox.addEventListener("input", renderStudents);
+
+  // --- NEW: CHATBOT LOGIC ---
+  const chatToggleBtn = document.getElementById("chatToggleBtn");
+  const chatContainer = document.getElementById("chatContainer");
+  const closeChatBtn = document.getElementById("closeChatBtn");
+  const chatInput = document.getElementById("chatInput");
+  const sendMessageBtn = document.getElementById("sendMessageBtn");
+  const chatHistory = document.getElementById("chatHistory");
+
+  // Open/Close Chat
+  if (chatToggleBtn) {
+    chatToggleBtn.addEventListener("click", () => {
+      chatContainer.classList.remove("hidden");
+    });
+  }
+  if (closeChatBtn) {
+    closeChatBtn.addEventListener("click", () => {
+      chatContainer.classList.add("hidden");
+    });
+  }
+
+  // Send Message Logic
+  // Updated Send Message Function with Loader
+  async function sendMessage() {
+    const message = chatInput.value.trim();
+    if (!message) return;
+
+    // 1. Add User Message to UI
+    appendMessage("user", message);
+    chatInput.value = ""; // Clear input
+
+    // 2. Add "Typing..." Indicator
+    const loaderId = "loader-" + Date.now(); // Unique ID to find it later
+    const loaderDiv = document.createElement("div");
+    loaderDiv.classList.add("message", "bot-message");
+    loaderDiv.id = loaderId;
+
+    // Insert the 3 dots HTML
+    loaderDiv.innerHTML = `
+      <div class="typing-indicator">
+        <span></span><span></span><span></span>
+      </div>
+    `;
+
+    chatHistory.appendChild(loaderDiv);
+    chatHistory.scrollTop = chatHistory.scrollHeight; // Scroll to bottom
+
+    try {
+      // 3. Send to Backend
+      const res = await fetch("/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message }),
+      });
+
+      const data = await res.json();
+
+      // 4. Remove the Loader
+      const loaderToRemove = document.getElementById(loaderId);
+      if (loaderToRemove) loaderToRemove.remove();
+
+      // 5. Add Real Bot Response
+      appendMessage("bot", data.reply);
+    } catch (error) {
+      // Handle Error
+      const loaderToRemove = document.getElementById(loaderId);
+      if (loaderToRemove) loaderToRemove.remove();
+      appendMessage("bot", "❌ Error: Could not reach the AI server.");
+      console.error(error);
+    }
+  }
+
+  function appendMessage(sender, text) {
+    const msgDiv = document.createElement("div");
+    msgDiv.classList.add(
+      "message",
+      sender === "user" ? "user-message" : "bot-message"
+    );
+
+    // --- NEW FORMATTING LOGIC ---
+    if (sender === "bot") {
+      // 1. Convert **text** to <strong>text</strong> (Bold)
+      let formattedText = text.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+
+      // 2. Convert numbered lists (1. Name) to have line breaks
+      formattedText = formattedText.replace(/\n/g, "<br>");
+
+      msgDiv.innerHTML = formattedText; // Use innerHTML instead of textContent
+    } else {
+      msgDiv.textContent = text;
+    }
+    // -----------------------------
+
+    chatHistory.appendChild(msgDiv);
+    chatHistory.scrollTop = chatHistory.scrollHeight;
+  }
+  window.fillChat = function (text) {
+    const chatInput = document.getElementById("chatInput");
+    chatInput.value = text;
+    // Optional: Automatically send it
+    // document.getElementById("sendMessageBtn").click();
+  };
+  function appendLoader() {
+    const loaderDiv = document.createElement("div");
+    loaderDiv.classList.add("message", "bot-message");
+    const id = "loader-" + Date.now();
+    loaderDiv.id = id;
+    loaderDiv.innerHTML = `<div class="typing-indicator"><span></span><span></span><span></span></div>`;
+    chatHistory.appendChild(loaderDiv);
+    chatHistory.scrollTop = chatHistory.scrollHeight;
+    return id;
+  }
+
+  function removeLoader(id) {
+    const el = document.getElementById(id);
+    if (el) el.remove();
+  }
+
+  if (sendMessageBtn) {
+    sendMessageBtn.addEventListener("click", sendMessage);
+  }
+  if (chatInput) {
+    chatInput.addEventListener("keypress", (e) => {
+      if (e.key === "Enter") sendMessage();
+    });
+  }
 });
 
+// Preloader
 window.addEventListener("load", () => {
   const preloader = document.getElementById("preloader");
-  setTimeout(() => {
-    if (preloader) preloader.classList.add("hide");
+  if (preloader) {
     setTimeout(() => {
-      if (preloader) preloader.remove();
-    }, 1200);
-  }, 3000);
+      preloader.classList.add("hide");
+      setTimeout(() => preloader.remove(), 1200);
+    }, 1500);
+  }
 });
